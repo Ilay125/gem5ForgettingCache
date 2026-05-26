@@ -75,3 +75,18 @@ class SkewedAssociative(BaseIndexingPolicy):
 
     # Get the entry size from the parent (tags)
     entry_size = Param.Int(Parent.entry_size, "entry size in bytes")
+
+
+class ModuloSetAssociative(BaseIndexingPolicy):
+    type = "ModuloSetAssociative"
+    cxx_class = "gem5::ModuloSetAssociative"
+    cxx_header = "mem/cache/tags/indexing_policies/modulo_set_associative.hh"
+
+    # Get the size from the parent (cache)
+    size = Param.MemorySize("capacity in bytes")
+
+    # Get the entry size from the parent (tags)
+    entry_size = Param.Int("entry size in bytes")
+
+    # Get the associativity
+    assoc = Param.Int("associativity")

@@ -85,6 +85,11 @@ class BaseCache(ClockedObject):
 
     size = Param.MemorySize("Capacity")
     assoc = Param.Unsigned("Associativity")
+    drt = Param.Tick(
+        0, "Data retention time (DRT)"
+    )  # default 0 - no retention
+
+    top_mru = Param.Unsigned(0, "Number of MRU blocks to refresh in daemon")
 
     tag_latency = Param.Cycles("Tag lookup latency")
     data_latency = Param.Cycles("Data access latency")
@@ -168,6 +173,10 @@ class BaseCache(ClockedObject):
     # in the current cache. Typically, this would be enabled in the
     # data cache.
     write_allocator = Param.WriteAllocator(NULL, "Write allocator")
+
+    debug_drt_mode = Param.Int(
+        0, "Debug DRT mode: 0=count only, 1=WB on every access"
+    )
 
 
 class Cache(BaseCache):

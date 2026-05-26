@@ -61,6 +61,9 @@
 #include "mem/cache/tags/partitioning_policies/partition_manager.hh"
 #include "mem/packet.hh"
 #include "params/BaseSetAssoc.hh"
+#include "mem/cache/replacement_policies/mru_rp.hh"
+
+#include "sim/cur_tick.hh"
 
 namespace gem5
 {
@@ -86,6 +89,12 @@ class BaseSetAssoc : public BaseTags
 
     /** Replacement policy */
     replacement_policy::Base *replacementPolicy;
+
+    /**
+     * Data retention time (DRT) value in ticks.
+     * drt=0 <=> drt=infty
+     */
+    Tick drt;
 
   public:
     /** Convenience typedef. */
@@ -113,6 +122,33 @@ class BaseSetAssoc : public BaseTags
      * @param blk The block to invalidate.
      */
     void invalidate(CacheBlk *blk) override;
+
+    /**
+     * Checks if the cache has drt.
+     */
+    bool
+    isForgetting() const override
+    {
+        return drt > 0;
+    }
+
+    /**
+     * Checks if a block is expired, given it needs to be forgetting.
+     */
+    bool
+    isExpired(CacheBlk *blk) const override
+    {
+        return isForgetting() && curTick() >= blk->getLastUpdateTick() + drt;
+    }
+
+    /**
+     * Return drt
+     */
+    Tick
+    getDRT() const override
+    {
+        return drt;
+    }
 
     /**
      * Access block and update replacement data. May not succeed, in which case
@@ -252,6 +288,30 @@ class BaseSetAssoc : public BaseTags
             }
         }
         return false;
+    }
+
+    /**
+     * Get the MRU block of a given set
+     * 
+     * @param set Set idx to get the MRU
+     * @return pointer for the blk
+     */
+    CacheBlk* getMRU(int set) override;
+
+    /**
+     * Get the N top MRU blocks of a given set
+     * @param set Set idx to get the MRU
+     * @param n the number of top MRU blocks
+     * @return vecotr of pointers for top blks
+     */
+    std::vector<CacheBlk*> getNTopMRU(int set, int n) override;
+
+    /**
+     * Get the number of sets
+     */
+    unsigned getNumSets() const override
+    {
+        return blks.size() / allocAssoc;
     }
 };
 

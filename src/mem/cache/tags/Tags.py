@@ -64,6 +64,15 @@ class TaggedSetAssociative(TaggedIndexingPolicy):
     entry_size = Param.Int(Parent.entry_size, "entry size in bytes")
 
 
+class ModuloTaggedSetAssociative(TaggedIndexingPolicy):
+    type = "ModuloTaggedSetAssociative"
+    cxx_class = "gem5::ModuloTaggedSetAssociative"
+    cxx_header = "mem/cache/tags/tagged_entry.hh"
+
+    size = Param.MemorySize(Parent.size, "capacity in bytes")
+    entry_size = Param.Int(Parent.entry_size, "entry size in bytes")
+
+
 class BaseTags(ClockedObject):
     type = "BaseTags"
     abstract = True
@@ -122,6 +131,9 @@ class BaseSetAssoc(BaseTags):
     replacement_policy = Param.BaseReplacementPolicy(
         Parent.replacement_policy, "Replacement policy"
     )
+
+    # Get data retention time (DRT)
+    drt = Param.Tick(Parent.drt, "Data retention time")
 
 
 class SectorTags(BaseTags):

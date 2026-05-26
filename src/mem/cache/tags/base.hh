@@ -50,6 +50,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "base/callback.hh"
 #include "base/logging.hh"
@@ -158,6 +159,12 @@ class BaseTags : public ClockedObject
         statistics::Scalar tagAccesses;
         /** Number of data blocks consulted over all accesses. */
         statistics::Scalar dataAccesses;
+
+        /** Number of expired MRU blocks */
+        statistics::Scalar expiredMru;
+        /** Number of expired dead blocks */
+        statistics::Scalar expiredDeadBlk;
+
     } stats;
 
   public:
@@ -186,6 +193,11 @@ class BaseTags : public ClockedObject
      * Computes stats just prior to dump event
      */
     void computeStats();
+
+    /**
+     * Gets the number of blocks in system.
+     */
+    virtual unsigned getNumBlocks() const;
 
     /**
      * Print all tags used
@@ -264,6 +276,32 @@ class BaseTags : public ClockedObject
         stats.sampledRefs++;
 
         blk->invalidate();
+    }
+
+    /**
+     * This function checks if the cache is forgetting
+     * @return true if forgetting
+     */
+    virtual bool
+    isForgetting() const
+    {
+        return false;
+    }
+
+    /**
+     * This function checks if a given block is expired.
+     * @return true if expired
+     */
+    virtual bool
+    isExpired(CacheBlk *blk) const
+    {
+        return false;
+    }
+
+    virtual Tick
+    getDRT() const
+    {
+        return 0;
     }
 
     /**
@@ -353,6 +391,30 @@ class BaseTags : public ClockedObject
      * @param visitor Visitor to call on each block.
      */
     virtual bool anyBlk(std::function<bool(CacheBlk &)> visitor) = 0;
+
+    /**
+     * Returns the MRU block inside a set
+     * 
+     * @param set Set idx to get the MRU
+     * @return pointer for the blk
+     */
+    virtual CacheBlk* getMRU(int set) 
+    {
+        return nullptr;
+    }
+
+    virtual std::vector<CacheBlk*> getNTopMRU(int set, int n)
+    {
+        return {};
+    }
+
+    /**
+     * Return the number of sets
+     */
+    virtual unsigned getNumSets() const
+    {
+        return 1;
+    }
 
   private:
     /**

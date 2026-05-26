@@ -49,6 +49,7 @@
 #include "mem/cache/tags/indexing_policies/base.hh"
 #include "params/TaggedIndexingPolicy.hh"
 #include "params/TaggedSetAssociative.hh"
+#include "params/ModuloTaggedSetAssociative.hh"
 
 namespace gem5
 {
@@ -100,6 +101,44 @@ class TaggedSetAssociative : public TaggedIndexingPolicy
     {
         return (key.address << tagShift) | (entry->getSet() << setShift);
     }
+};
+
+class ModuloTaggedSetAssociative : public TaggedIndexingPolicy
+{
+    protected:
+        virtual uint32_t
+        extractSet(const KeyType &key) const
+        {
+            Addr blkID = key.address >> setShift;
+            return blkID % numSets;
+        }
+
+        virtual Addr
+        extractTag(const Addr addr) const override
+        {
+            Addr blkID = addr >> setShift;
+            return blkID / numSets;
+        }
+
+    public:
+        PARAMS(ModuloTaggedSetAssociative);
+
+        ModuloTaggedSetAssociative(const Params &p)
+            : TaggedIndexingPolicy(p, p.size / p.entry_size, floorLog2(p.entry_size))
+        {}
+
+        std::vector<ReplaceableEntry*>
+        getPossibleEntries(const KeyType &key) const override
+        {
+            return sets[extractSet(key)];
+        }
+
+        Addr
+        regenerateAddr(const KeyType &key,
+                    const ReplaceableEntry *entry) const override
+        {
+            return ((key.address * numSets) + entry->getSet()) << setShift;
+        }
 };
 
 /**

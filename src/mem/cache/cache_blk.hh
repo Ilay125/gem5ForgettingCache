@@ -152,6 +152,15 @@ class CacheBlk : public TaggedEntry
      * on the block since the last store. */
     std::list<Lock> lockList;
 
+    /** Last time an update was performed to keep track of retention. */
+    Tick lastUpdatedTick;
+
+    /** Debug flag - mark if the block can forget */
+    bool isForgettingBlk;
+
+    /** Mark if a block was opp refreshed to track */
+    bool wasOppRefreshed;
+
   public:
     CacheBlk() : TaggedEntry()
     {
@@ -190,11 +199,51 @@ class CacheBlk : public TaggedEntry
         setSrcRequestorId(other.getSrcRequestorId());
         std::swap(lockList, other.lockList);
 
+        setLastUpdateTick(other.getLastUpdateTick());
+        setIsForgettingBlk(other.getIsForgettingBlk());
+        setWasOppRefreshed(other.getWasOppRefreshed());
+
         other.invalidate();
 
         return *this;
     }
     virtual ~CacheBlk() {};
+
+    Tick
+    getLastUpdateTick() const
+    {
+        return lastUpdatedTick;
+    }
+
+    void
+    setLastUpdateTick(Tick const tick)
+    {
+        lastUpdatedTick = tick;
+    }
+
+    bool
+    getIsForgettingBlk() const
+    {
+        return isForgettingBlk;
+    }
+
+    void
+    setIsForgettingBlk(bool status)
+    {
+        isForgettingBlk = status;
+    }
+
+    void
+    setWasOppRefreshed(bool status)
+    {
+        wasOppRefreshed = status;
+    }
+
+    bool
+    getWasOppRefreshed() const
+    {
+        return wasOppRefreshed;
+    }
 
     /**
      * Invalidate the block and clear all state.
@@ -212,6 +261,9 @@ class CacheBlk : public TaggedEntry
         setRefCount(0);
         setSrcRequestorId(Request::invldRequestorId);
         lockList.clear();
+        setLastUpdateTick(MaxTick);
+        setIsForgettingBlk(true); // default the block is forgetting
+        setWasOppRefreshed(false);
     }
 
     /**
