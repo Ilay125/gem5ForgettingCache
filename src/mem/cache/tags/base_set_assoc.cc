@@ -93,7 +93,7 @@ BaseSetAssoc::getMRU(int set)
             // Get the MRU metadata (latest tick changed)
             auto data = std::static_pointer_cast<replacement_policy::MRU::MRUReplData>(
                 blk->replacementData);
-            
+
             // Changed current block later than saved one
             if (data && data->lastTouchTick >= latest_tick) {
                 mru = blk;
@@ -128,10 +128,22 @@ BaseSetAssoc::getNTopMRU(int set, int n)
 
     // Get first N
     if (set_blks.size() > n) {
-        set_blks.resize(n); 
+        set_blks.resize(n);
     }
 
     return set_blks;
 }
 
+std::vector<CacheBlk*>
+BaseSetAssoc::getSetBlks(int set)
+{
+    std::vector<CacheBlk*> set_blks;
+
+    // Fill the vector with the entire set
+    for (int way = 0; way < allocAssoc; way++) {
+        set_blks.push_back(&blks.at(way + set * allocAssoc));
+    }
+
+    return set_blks;
+}
 } // namespace gem5

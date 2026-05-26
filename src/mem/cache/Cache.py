@@ -91,6 +91,8 @@ class BaseCache(ClockedObject):
 
     top_mru = Param.Unsigned(0, "Number of MRU blocks to refresh in daemon")
 
+    refresh_dirty_daemon = Param.Bool(0, "Refresh dirty blocks using daemon process")
+
     tag_latency = Param.Cycles("Tag lookup latency")
     data_latency = Param.Cycles("Data access latency")
     response_latency = Param.Cycles("Latency for the return path on a miss")

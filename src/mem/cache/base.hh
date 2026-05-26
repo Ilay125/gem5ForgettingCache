@@ -368,6 +368,9 @@ class BaseCache : public ClockedObject
     /** Number of top mru block to actively refresh */
     unsigned topMRU;
 
+    /** Refresh dirty blocks using a daemon process */
+    bool refreshDirtyDaemon;
+
     /** Shadow FA LRU cache to keep track on conflicts */
     std::list<Addr> shadowLRU;
     std::unordered_map<Addr, std::list<Addr>::iterator> shadowMap;

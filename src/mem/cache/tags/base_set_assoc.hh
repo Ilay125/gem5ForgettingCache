@@ -292,7 +292,7 @@ class BaseSetAssoc : public BaseTags
 
     /**
      * Get the MRU block of a given set
-     * 
+     *
      * @param set Set idx to get the MRU
      * @return pointer for the blk
      */
@@ -305,6 +305,13 @@ class BaseSetAssoc : public BaseTags
      * @return vecotr of pointers for top blks
      */
     std::vector<CacheBlk*> getNTopMRU(int set, int n) override;
+
+    /**
+     * Get the blocks of a given set
+     * @param set Set idx to get the MRU
+     * @return vecotr of pointers for top blks
+     */
+    std::vector<CacheBlk*> getSetBlks(int set) override;
 
     /**
      * Get the number of sets

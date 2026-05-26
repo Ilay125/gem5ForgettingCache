@@ -89,6 +89,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       tags(p.tags),
       debugDRTMode(p.debug_drt_mode),
       topMRU(p.top_mru),
+      refreshDirtyDaemon(p.refresh_dirty_daemon),
       compressor(p.compressor),
       partitionManager(p.partitioning_manager),
       prefetcher(p.prefetcher),
@@ -158,7 +159,7 @@ BaseCache::startup()
     // Run parent startup before
     ClockedObject::startup();
 
-    if (topMRU > 0) {
+    if (topMRU > 0 || refreshDirtyDaemon) {
         schedule(refreshEvent, clockEdge(Cycles(1)));
     }
 }
@@ -167,37 +168,63 @@ void
 BaseCache::processRefreshEvent()
 {
 
-    DPRINTF(Cache, "RefreshDaemon: Checking Set %d | PortBusy: %d\n", 
+    DPRINTF(Cache, "RefreshDaemon: Checking Set %d | PortBusy: %d\n",
             refreshSetIdx, cpuSidePort.isBlocked());
 
     // Checks if a cycle is idle
     if (!cpuSidePort.isBlocked() && !blocked) {
 
-        // Get MRU block
-        std::vector<CacheBlk*> topMRUBlks = tags->getNTopMRU(refreshSetIdx, topMRU);
+        if (refreshDirtyDaemon) {
+            std::vector<CacheBlk*> setBlks = tags->getSetBlks(refreshSetIdx);
 
-        int rank_tracker = 0;
+            for (CacheBlk* blk : setBlks) {
+                if (blk && blk->isValid() && tags->isForgetting()) {
+                    Tick age = curTick() - blk->getLastUpdateTick();
+                    Tick drt = tags->getDRT();
 
-        for (CacheBlk* mru : topMRUBlks) {
-            if (mru && mru->isValid() && tags->isForgetting()) {
-                Tick age = curTick() - mru->getLastUpdateTick();
-                Tick drt = tags->getDRT();
+                    DPRINTF(Cache, "RefreshDaemon: Set %d | addr %#lx | Age: %lu | DRT: %lu\n",
+                                refreshSetIdx, blk->getTag(), age, drt);
 
-                DPRINTF(Cache, "RefreshDaemon: Set %d | Rank %d | addr %#lx | Age: %lu | DRT: %lu\n", 
-                            refreshSetIdx, rank_tracker, mru->getTag(), age, drt);
-                
-                if (!tags->isExpired(mru) && age >= drt * 0.8) {
-                    DPRINTF(Cache, "RefreshDaemon: SUCCESS - Saved Rank %d block %#lx\n", 
-                                 rank_tracker, mru->getTag());
-                    
-                    // Opportunistic refresh
-                    mru->setLastUpdateTick(curTick());
-                    mru->setWasOppRefreshed(true);
+                    if (!tags->isExpired(blk) && age >= drt * 0.8 && blk->isSet(CacheBlk::DirtyBit)) {
+                        DPRINTF(Cache, "RefreshDaemon: SUCCESS - block %#lx\n", blk->getTag());
 
-                    stats.oppRefreshSucc++;
+                        // Opportunistic refresh
+                        blk->setLastUpdateTick(curTick());
+                        blk->setWasOppRefreshed(true);
+
+                        stats.oppRefreshSucc++;
+                    }
                 }
             }
-            rank_tracker++;
+        }
+
+        if (topMRU > 0) {
+            // Get MRU block
+            std::vector<CacheBlk*> topMRUBlks = tags->getNTopMRU(refreshSetIdx, topMRU);
+
+            int rank_tracker = 0;
+
+            for (CacheBlk* mru : topMRUBlks) {
+                if (mru && mru->isValid() && tags->isForgetting()) {
+                    Tick age = curTick() - mru->getLastUpdateTick();
+                    Tick drt = tags->getDRT();
+
+                    DPRINTF(Cache, "RefreshDaemon: Set %d | Rank %d | addr %#lx | Age: %lu | DRT: %lu\n",
+                                refreshSetIdx, rank_tracker, mru->getTag(), age, drt);
+
+                    if (!tags->isExpired(mru) && age >= drt * 0.8) {
+                        DPRINTF(Cache, "RefreshDaemon: SUCCESS - Saved Rank %d block %#lx\n",
+                                    rank_tracker, mru->getTag());
+
+                        // Opportunistic refresh
+                        mru->setLastUpdateTick(curTick());
+                        mru->setWasOppRefreshed(true);
+
+                        stats.oppRefreshSucc++;
+                    }
+                }
+                rank_tracker++;
+            }
         }
 
         refreshSetIdx = (refreshSetIdx + 1) % tags->getNumSets();
@@ -1373,7 +1400,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
                 name());
 
     Cycles tag_latency(0);
-    
+
     // Set stats and hanldler status
     bool expired_mode_1 = false;
 
@@ -1391,7 +1418,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
         if (candidate && tags->isExpired(candidate)) {
             // Gaurd if the block waits in mshr (O3)
-            if (mshrQueue.findMatch(blk_addr, pkt->isSecure()) || 
+            if (mshrQueue.findMatch(blk_addr, pkt->isSecure()) ||
                 writeBuffer.findMatch(blk_addr, pkt->isSecure())) {
                 expired_mode_1 = false;
             } else {
@@ -1411,7 +1438,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
                 Tick age = curTick() - candidate->getLastUpdateTick();
                 Tick drt = tags->getDRT();
-                
+
                 // If it died recently: between 100% and 120% of DRT
                 if (drt > 0 && age >= drt && age < (drt * 1.2)) {
                     stats.expiredHitPot++;
@@ -1421,9 +1448,9 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
                 if (debugDRTMode == 1) {
                     expired_mode_1 = true; // Flag to not override
                 }
-            } 
+            }
         }
-    } 
+    }
 
     // Handles block as for expiration policy
     if (expired_mode_1 && candidate) {
@@ -1456,7 +1483,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
         if (blk && tags->isForgetting()) {
             //blk->setLastUpdateTick(curTick());
         }
-        
+
     }
 
 
@@ -1591,7 +1618,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
         DPRINTF(Cache, "%s new state is %s\n", __func__, blk->print());
 
         incHitCount(pkt, blk);
-        
+
 
         // When the packet metadata arrives, the tag lookup will be done while
         // the payload is arriving. Then the block will be ready to access as
