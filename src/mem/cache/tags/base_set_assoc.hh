@@ -311,7 +311,7 @@ class BaseSetAssoc : public BaseTags
      * @param set Set idx to get the MRU
      * @return vecotr of pointers for top blks
      */
-    std::vector<CacheBlk*> getSetBlks(int set) override;
+    std::vector<CacheBlk *> getSetBlks(int set) override;
 
     /**
      * Get the number of sets

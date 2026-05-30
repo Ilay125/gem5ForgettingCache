@@ -95,7 +95,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       prefetcher(p.prefetcher),
       writeAllocator(p.write_allocator),
       refreshSetIdx(0),
-      refreshEvent([this] { processRefreshEvent(); }, name() ),
+      refreshEvent([this] { processRefreshEvent(); }, name()),
       writebackClean(p.writeback_clean),
       tempBlockWriteback(nullptr),
       writebackTempBlockAtomicEvent([this] { writebackTempBlockAtomic(); },
@@ -175,18 +175,22 @@ BaseCache::processRefreshEvent()
     if (!cpuSidePort.isBlocked() && !blocked) {
 
         if (refreshDirtyDaemon) {
-            std::vector<CacheBlk*> setBlks = tags->getSetBlks(refreshSetIdx);
+            std::vector<CacheBlk *> setBlks = tags->getSetBlks(refreshSetIdx);
 
-            for (CacheBlk* blk : setBlks) {
+            for (CacheBlk *blk : setBlks) {
                 if (blk && blk->isValid() && tags->isForgetting()) {
                     Tick age = curTick() - blk->getLastUpdateTick();
                     Tick drt = tags->getDRT();
 
-                    DPRINTF(Cache, "RefreshDaemon: Set %d | addr %#lx | Age: %lu | DRT: %lu\n",
-                                refreshSetIdx, blk->getTag(), age, drt);
+                    DPRINTF(Cache,
+                            "RefreshDaemon: Set %d | addr %#lx | Age: %lu | "
+                            "DRT: %lu\n",
+                            refreshSetIdx, blk->getTag(), age, drt);
 
-                    if (!tags->isExpired(blk) && age >= drt * 0.8 && blk->isSet(CacheBlk::DirtyBit)) {
-                        DPRINTF(Cache, "RefreshDaemon: SUCCESS - block %#lx\n", blk->getTag());
+                    if (!tags->isExpired(blk) && age >= drt * 0.8 &&
+                        blk->isSet(CacheBlk::DirtyBit)) {
+                        DPRINTF(Cache, "RefreshDaemon: SUCCESS - block %#lx\n",
+                                blk->getTag());
 
                         // Opportunistic refresh
                         blk->setLastUpdateTick(curTick());
@@ -200,21 +204,27 @@ BaseCache::processRefreshEvent()
 
         if (topMRU > 0) {
             // Get MRU block
-            std::vector<CacheBlk*> topMRUBlks = tags->getNTopMRU(refreshSetIdx, topMRU);
+            std::vector<CacheBlk *> topMRUBlks =
+                tags->getNTopMRU(refreshSetIdx, topMRU);
 
             int rank_tracker = 0;
 
-            for (CacheBlk* mru : topMRUBlks) {
+            for (CacheBlk *mru : topMRUBlks) {
                 if (mru && mru->isValid() && tags->isForgetting()) {
                     Tick age = curTick() - mru->getLastUpdateTick();
                     Tick drt = tags->getDRT();
 
-                    DPRINTF(Cache, "RefreshDaemon: Set %d | Rank %d | addr %#lx | Age: %lu | DRT: %lu\n",
-                                refreshSetIdx, rank_tracker, mru->getTag(), age, drt);
+                    DPRINTF(Cache,
+                            "RefreshDaemon: Set %d | Rank %d | addr %#lx | "
+                            "Age: %lu | DRT: %lu\n",
+                            refreshSetIdx, rank_tracker, mru->getTag(), age,
+                            drt);
 
                     if (!tags->isExpired(mru) && age >= drt * 0.8) {
-                        DPRINTF(Cache, "RefreshDaemon: SUCCESS - Saved Rank %d block %#lx\n",
-                                    rank_tracker, mru->getTag());
+                        DPRINTF(Cache,
+                                "RefreshDaemon: SUCCESS - Saved Rank %d block "
+                                "%#lx\n",
+                                rank_tracker, mru->getTag());
 
                         // Opportunistic refresh
                         mru->setLastUpdateTick(curTick());
@@ -922,7 +932,7 @@ BaseCache::updateBlockData(CacheBlk *blk, const PacketPtr cpkt,
         cpkt->writeDataToBlock(blk->data, blkSize);
         // If cache is forgetting, update lastUpdateTick to keep track on drt
         if (tags->isForgetting()) {
-            blk->setLastUpdateTick(curTick());
+            //blk->setLastUpdateTick(curTick());
         }
     }
 
@@ -990,7 +1000,7 @@ BaseCache::cmpAndSwap(CacheBlk *blk, PacketPtr pkt)
         }
 
         if (tags->isForgetting()) {
-            blk->setLastUpdateTick(curTick());
+            //blk->setLastUpdateTick(curTick());
         }
     }
 }
@@ -1276,7 +1286,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
 
             // refresh DRT because data was written in place
             if (tags->isForgetting()) {
-                blk->setLastUpdateTick(curTick());
+                //blk->setLastUpdateTick(curTick());
             }
 
             // Inform of this block's data contents update
@@ -1483,7 +1493,6 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
         if (blk && tags->isForgetting()) {
             //blk->setLastUpdateTick(curTick());
         }
-
     }
 
 
@@ -1618,7 +1627,6 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
         DPRINTF(Cache, "%s new state is %s\n", __func__, blk->print());
 
         incHitCount(pkt, blk);
-
 
         // When the packet metadata arrives, the tag lookup will be done while
         // the payload is arriving. Then the block will be ready to access as

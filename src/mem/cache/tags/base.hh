@@ -398,7 +398,8 @@ class BaseTags : public ClockedObject
      * @param set Set idx to get the MRU
      * @return pointer for the blk
      */
-    virtual CacheBlk* getMRU(int set)
+    virtual CacheBlk *
+    getMRU(int set)
     {
         return nullptr;
     }
@@ -408,7 +409,8 @@ class BaseTags : public ClockedObject
         return {};
     }
 
-    virtual std::vector<CacheBlk*> getSetBlks(int set)
+    virtual std::vector<CacheBlk *>
+    getSetBlks(int set)
     {
         return {};
     }

@@ -134,10 +134,10 @@ BaseSetAssoc::getNTopMRU(int set, int n)
     return set_blks;
 }
 
-std::vector<CacheBlk*>
+std::vector<CacheBlk *>
 BaseSetAssoc::getSetBlks(int set)
 {
-    std::vector<CacheBlk*> set_blks;
+    std::vector<CacheBlk *> set_blks;
 
     // Fill the vector with the entire set
     for (int way = 0; way < allocAssoc; way++) {
