@@ -932,7 +932,7 @@ BaseCache::updateBlockData(CacheBlk *blk, const PacketPtr cpkt,
         cpkt->writeDataToBlock(blk->data, blkSize);
         // If cache is forgetting, update lastUpdateTick to keep track on drt
         if (tags->isForgetting()) {
-            //blk->setLastUpdateTick(curTick());
+            // blk->setLastUpdateTick(curTick());
         }
     }
 
@@ -1000,7 +1000,7 @@ BaseCache::cmpAndSwap(CacheBlk *blk, PacketPtr pkt)
         }
 
         if (tags->isForgetting()) {
-            //blk->setLastUpdateTick(curTick());
+            // blk->setLastUpdateTick(curTick());
         }
     }
 }
@@ -1286,7 +1286,7 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
 
             // refresh DRT because data was written in place
             if (tags->isForgetting()) {
-                //blk->setLastUpdateTick(curTick());
+                // blk->setLastUpdateTick(curTick());
             }
 
             // Inform of this block's data contents update
@@ -1922,6 +1922,11 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
 
     // Insert new block at victimized entry
     tags->insertBlock(pkt, victim);
+
+    // Start DRT timer for allocated block
+    if (tags->isForgetting()) {
+        victim->setLastUpdateTick(curTick());
+    }
 
     // If using a compressor, set compression data. This must be done after
     // insertion, as the compression bit may be set.
