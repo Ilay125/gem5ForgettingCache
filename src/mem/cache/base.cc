@@ -196,7 +196,7 @@ BaseCache::processRefreshEvent()
                         // Refresh the block
                         blk->setLastUpdateTick(curTick());
                         blk->setWasOppRefreshed(true);
-                        
+
 
                         stats.totalRefreshes++;
 
@@ -240,7 +240,7 @@ BaseCache::processRefreshEvent()
                         // Refresh the block
                         mru->setLastUpdateTick(curTick());
                         mru->setWasOppRefreshed(true);
-                        
+
                         stats.totalRefreshes++;
 
                         if (opp_refresh) {
@@ -257,7 +257,7 @@ BaseCache::processRefreshEvent()
         }
     }
 
-    // Always advance the set index so the daemon continues scanning 
+    // Always advance the set index so the daemon continues scanning
     // through the cache even during prolonged CPU stalls.
     refreshSetIdx = (refreshSetIdx + 1) % tags->getNumSets();
 
@@ -2845,7 +2845,10 @@ BaseCache::CacheStats::regStats()
     dataExpansions.flags(nozero | nonan);
     dataContractions.flags(nozero | nonan);
 
-    oppRefreshSucc.flags(total);
+    oppRefresh.flags(total);
+    forceRefresh.flags(total);
+    totalRefreshed.flags(total);
+
     expiredHitPot.flags(total);
     refreshedBlockUtility.flags(total);
 }
