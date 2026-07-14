@@ -2596,7 +2596,7 @@ BaseCache::CacheStats::CacheStats(BaseCache &c)
                "number of refreshes in 80% window in idle cycle"),
       ADD_STAT(forceRefresh, statistics::units::Count::get(),
                "number of forced refreshes in 95% window"),
-      ADD_STAT(totalRefresh, statistics::units::Count::get(),
+      ADD_STAT(totalRefreshes, statistics::units::Count::get(),
                "number of total refreshes"),
 
       ADD_STAT(expiredHitPot, statistics::units::Count::get(),
@@ -2847,7 +2847,7 @@ BaseCache::CacheStats::regStats()
 
     oppRefresh.flags(total);
     forceRefresh.flags(total);
-    totalRefreshed.flags(total);
+    totalRefreshes.flags(total);
 
     expiredHitPot.flags(total);
     refreshedBlockUtility.flags(total);
