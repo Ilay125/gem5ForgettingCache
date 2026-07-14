@@ -1197,7 +1197,10 @@ class BaseCache : public ClockedObject
         statistics::Scalar dataContractions;
 
         /** Total successful refreshes performed during idle cycles */
-        statistics::Scalar oppRefreshSucc;
+        statistics::Scalar oppRefresh;
+        statistics::Scalar forceRefresh;
+        statistics::Scalar totalRefreshes;
+
         /** Number of misses due to a block being recently expired */
         statistics::Scalar expiredHitPot;
         /** Blocks used that were recently refreshed */
