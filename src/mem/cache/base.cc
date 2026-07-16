@@ -167,89 +167,95 @@ BaseCache::startup()
 void
 BaseCache::processRefreshEvent()
 {
-    // Evaluate block state once at the start of the cycle
     bool is_blocked = cpuSidePort.isBlocked() || blocked;
 
-    DPRINTF(Cache, "RefreshDaemon: Checking Set %d | PortBlocked/Stalled: %d\n",
+    DPRINTF(Cache, "RefreshDaemon: Set %d | Blocked: %d\n",
             refreshSetIdx, is_blocked);
 
+    // Adaptive Thresholds
+    double sweep_cycles = double(tags->getNumSets());
+    double drt_cycles   = double(tags->getDRT()) / double(clockPeriod());
+
+    double force_thresh = 0.95;
+    if (drt_cycles > 0.0) {
+        // leave a window >= sweep time, plus 2% safety margin
+        double needed = 1.0 - (sweep_cycles / drt_cycles) - 0.02;
+        force_thresh = std::min(0.95, std::max(0.50, needed));
+    }
+    double opp_thresh = std::min(0.80, force_thresh - 0.05);
+
+    // ------------------------------------------------------------------
     if (refreshDirtyDaemon) {
         std::vector<CacheBlk *> setBlks = tags->getSetBlks(refreshSetIdx);
 
         for (CacheBlk *blk : setBlks) {
-            if (blk && blk->isValid() && tags->isForgetting()) {
-                Tick age = curTick() - blk->getLastUpdateTick();
-                Tick drt = tags->getDRT();
+            if (!(blk && blk->isValid() && tags->isForgetting()))
+                continue;
+            if (!blk->isSet(CacheBlk::DirtyBit))
+                continue;
 
-                DPRINTF(Cache,
-                        "RefreshDaemon: Set %d | addr %#lx | Age: %lu | DRT: %lu\n",
-                        refreshSetIdx, blk->getTag(), age, drt);
+            Tick age = curTick() - blk->getLastUpdateTick();
+            Tick drt = tags->getDRT();
 
-                if (!tags->isExpired(blk) && blk->isSet(CacheBlk::DirtyBit)) {
-                    bool force_refresh = (age >= drt * 0.95);
-                    bool opp_refresh   = (!is_blocked && age >= drt * 0.8);
+            bool force_refresh = (age >= drt * force_thresh);
+            bool opp_refresh   = (!is_blocked && age >= drt * opp_thresh);
 
-                    if (force_refresh || opp_refresh) {
-                        DPRINTF(Cache, "RefreshDaemon: %s SUCCESS - block %#lx\n",
-                                force_refresh ? "FORCE" : "OPP", blk->getTag());
+            if (force_refresh || opp_refresh) {
+                DPRINTF(Cache, "RefreshDaemon: %s dirty block %#lx age %lu\n",
+                        force_refresh ? "FORCE" : "OPP", blk->getTag(), age);
 
-                        // Refresh the block
-                        blk->setLastUpdateTick(curTick());
-                        blk->setWasOppRefreshed(true);
+                blk->setLastUpdateTick(curTick());
+                blk->setWasOppRefreshed(true);
 
-
-                        stats.totalRefreshes++;
-
-                        if (opp_refresh) {
-                            stats.oppRefresh++;
-                        }
-
-                        if (force_refresh) {
-                            stats.forceRefresh++;
-                        }
-
-                    }
+                stats.totalRefreshes++;
+                if (force_refresh) {
+                    stats.forceRefresh++;
+                } else   {             
+                    stats.oppRefresh++;   // mutually exclusive
                 }
             }
         }
     }
 
     if (topMRU > 0) {
-        // Get MRU blocks
-        std::vector<CacheBlk *> topMRUBlks = tags->getNTopMRU(refreshSetIdx, topMRU);
+        std::vector<CacheBlk *> topMRUBlks =
+            tags->getNTopMRU(refreshSetIdx, topMRU);
         int rank_tracker = 0;
 
         for (CacheBlk *mru : topMRUBlks) {
-            if (mru && mru->isValid() && tags->isForgetting()) {
-                Tick age = curTick() - mru->getLastUpdateTick();
-                Tick drt = tags->getDRT();
+            if (!(mru && mru->isValid() && tags->isForgetting())) {
+                rank_tracker++;
+                continue;
+            }
 
-                DPRINTF(Cache,
-                        "RefreshDaemon: Set %d | Rank %d | addr %#lx | Age: %lu | DRT: %lu\n",
-                        refreshSetIdx, rank_tracker, mru->getTag(), age, drt);
+            // EXPLICIT DOUBLE-COUNTING CHECK
+            // If this block was just refreshed in the Dirty loop above, 
+            // its update tick is exactly curTick(). Skip it.
+            if (mru->getLastUpdateTick() == curTick()) {
+                rank_tracker++;
+                continue;
+            }
+            
+            Tick age = curTick() - mru->getLastUpdateTick();
+            Tick drt = tags->getDRT();
 
-                if (!tags->isExpired(mru)) {
-                    bool force_refresh = (age >= drt * 0.95);
-                    bool opp_refresh   = (!is_blocked && age >= drt * 0.8);
+            if (!tags->isExpired(mru)) {
+                bool force_refresh = (age >= drt * force_thresh);
+                bool opp_refresh   = (!is_blocked && age >= drt * opp_thresh);
 
-                    if (force_refresh || opp_refresh) {
-                        DPRINTF(Cache,
-                                "RefreshDaemon: %s SUCCESS - Saved Rank %d block %#lx\n",
-                                force_refresh ? "FORCE" : "OPP", rank_tracker, mru->getTag());
+                if (force_refresh || opp_refresh) {
+                    DPRINTF(Cache, "RefreshDaemon: %s MRU rank %d block %#lx\n",
+                            force_refresh ? "FORCE" : "OPP",
+                            rank_tracker, mru->getTag());
 
-                        // Refresh the block
-                        mru->setLastUpdateTick(curTick());
-                        mru->setWasOppRefreshed(true);
+                    mru->setLastUpdateTick(curTick());
+                    mru->setWasOppRefreshed(true);
 
-                        stats.totalRefreshes++;
-
-                        if (opp_refresh) {
-                            stats.oppRefresh++;
-                        }
-
-                        if (force_refresh) {
-                            stats.forceRefresh++;
-                        }
+                    stats.totalRefreshes++;
+                    if (force_refresh) {
+                        stats.forceRefresh++;
+                    } else {
+                        stats.oppRefresh++;
                     }
                 }
             }
@@ -257,11 +263,7 @@ BaseCache::processRefreshEvent()
         }
     }
 
-    // Always advance the set index so the daemon continues scanning
-    // through the cache even during prolonged CPU stalls.
     refreshSetIdx = (refreshSetIdx + 1) % tags->getNumSets();
-
-    // Schedules the next event to keep daemon running
     schedule(refreshEvent, clockEdge(Cycles(1)));
 }
 
